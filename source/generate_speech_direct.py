@@ -73,6 +73,6 @@ if __name__ == "__main__":
     # get_list_speaker(root)
     
     # After call get_list_speaker, join two folders vox1_dev_wav and vox1_test_wav
-    # ROOT_FOLDER contains 1251 folders
+    # ROOT_FOLDER contains 1251 folders, each folder represent only speakers
     generate_speech_path(constants.ROOT_FOLDER)
     
