@@ -12,7 +12,7 @@ import numpy as np
 
 def get_mfcc_features(wav_file, num_cepstral = 13, derivative = True, cmvn_size = 0):    
     # Read signal wav from file
-    [signal,fs] = librosa.load(wav_file, constants.SAMPLE_RATE)
+    [signal,fs] = librosa.load(wav_file, constants.SAMPLE_RATE, mono=True)
     signal *= 2**15
 
     # Extract MFCCs features

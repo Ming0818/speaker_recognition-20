@@ -5,7 +5,6 @@ Created on Thu Mar 28 00:41:57 2019
 @author: Vo Thanh Phuong
 """
 
-from MFCCExtractor import mfcc_extractor
 from sklearn.cluster import KMeans
 from scipy.stats import multivariate_normal as mvnpdf
 import numpy as np
@@ -18,17 +17,20 @@ class gm_cluster:
         self.prior = prior
         self.mean = np.mean(data, axis=0)
         self.min_covar = min_covar
-        self.covariance = np.cov(data, rowvar=0) + min_covar * np.eye(len(self.mean))
         self.dim = len(self.mean)
+        self.update_covariance(np.cov(data, rowvar=0))
 
-    def fix_covariance(self):
+    def update_covariance(self, covariance):
+        self.covariance = covariance
         self.covariance += self.min_covar * np.eye(self.dim)
+        
+        det = np.fabs(np.linalg.det(self.covariance))
+        self.inv_covariance = np.linalg.inv(self.covariance)
+        self.factor = (2.0 * np.pi)**(self.dim / 2.0) * (det)**(0.5)
 
     def pdf(self, x):
-        factor = 1.0 / (((2 * np.pi) ** (self.dim / 2)) * (np.linalg.det(self.covariance) ** 0.5))
-        tmp = x - self.mean
-        inv_covar = np.linalg.inv(self.covariance)
-        return factor * np.exp(-0.5 * np.dot(np.dot(tmp,inv_covar), tmp))
+        tmp = x - self.mean        
+        return np.exp(-0.5 * np.dot(np.dot(tmp,self.inv_covariance), tmp)) / self.factor
 
 class gm_model:
     def __init__(self, n_components=1, covariance_type='full', tol = 1e-3, min_covar = 1e-3, max_iter=100):
@@ -42,8 +44,12 @@ class gm_model:
         label = (KMeans(self.n_componens, random_state=999)).fit(data).labels_
         clusters = []
         for i in range(self.n_componens):
-            sub_data = data[label == i]
-            clusters.append(gm_cluster(len(sub_data)/len(label), sub_data, 
+            sub_data = data[label == i] 
+            prior = len(sub_data) / len(label)               
+            if len(sub_data) == 1:
+                x = data[np.random.choice(range(len(data)), 5)]
+                sub_data = np.concatenate((sub_data, x), axis = 0)
+            clusters.append(gm_cluster(prior, sub_data, 
                                        self.min_covar))
         return clusters
     
@@ -54,10 +60,13 @@ class gm_model:
         N = len(data)
         detail = np.zeros((N, self.n_componens))
         for i in range(N):
+            total = 0
             for j in range(self.n_componens):
                 comp = self.clusters[j]
                 detail[i,j] = comp.prior * comp.pdf(data[i,:])
-            detail[i,:] = detail[i,:] / np.sum(detail[i, :], axis = 0)
+                total += detail[i,j]
+            #detail[i,:] = detail[i,:] / np.sum(detail[i, :], axis = 0)
+            detail[i,:] /= total
         return detail
     
     def m_step(self, data, detail):
@@ -66,17 +75,27 @@ class gm_model:
         for i in range(self.n_componens):
             comp = self.clusters[i]
             comp.mean = np.dot(detail[:,i].T, data) / total[i]
-            comp.covariance = np.zeros((comp.dim, comp.dim))
+            covariance = np.zeros((comp.dim, comp.dim))
             for j in range(N):
                 dx = data[j,:] - comp.mean
-                comp.covariance += detail[j,i] * np.outer(dx,dx)
-            comp.covariance /= total[i]
-            comp.fix_covariance()
+                covariance += detail[j,i] * np.outer(dx,dx)
+            covariance /= total[i]            
+            comp.update_covariance(covariance)
             #if self.covariance_type == 'diag':
             #    comp.covariance = np.diag(comp.covariance)
             comp.prior = total[i] / N
 
         return
+    
+    def partial_fit(self, data, init = False):
+        if init == True:
+            self.clusters = self.gmm_init_kmeans(data)
+            
+        detail = self.e_step(data)                
+        self.m_step(data, detail)
+            
+        likelihood = np.sum(np.log(self.pdf(data)))
+        return likelihood
     
     def fit(self, data):
         self.clusters = self.gmm_init_kmeans(data)
@@ -105,9 +124,6 @@ class gm_model:
     
     def score(self, data):
         return np.sum(np.log(self.pdf(data))) / len(data)
-    
-    def supervector(self):
-        return None
             
     def mean(self):
         mean = np.zeros((1,self.dim))

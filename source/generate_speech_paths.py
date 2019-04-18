@@ -7,33 +7,33 @@ Created on Tue Apr 16 02:36:54 2019
 
 import os
 import numpy as np
-import shutil
 import constants
 
 def get_all_file(direct, fileType = 'wav'):
+    # get all files has a type which is fileType. Use recursion
     result = []
     folder = os.listdir(direct)
     for item in folder:
         new_direct = direct + '/' + item
-        if os.path.isfile(new_direct):
+        if os.path.isfile(new_direct):      # if it's file, check fileType
             if item.endswith('.{}'.format(fileType)):
                 result.append(new_direct)
-        else:
+        else:   # if it's folder, call get_all_file with this folder
             result = result + get_all_file(new_direct, fileType)
     
     return result
 
 def generate_speech_paths(wav_folder):    
-    #root contains 1251 speakers folder
+    # @root contains 1251 speakers folder
     
-    part = ['dev', 'test']
-     
-    for i in range(len(part)):
+    paths = [constants.DEV_PATHS, constants.TEST_PATHS]
+    list_speakers_file = [constants.DEV_SPEAKERS, constants.TEST_SPEAKERS]
+    
+    for i in range(len(paths)):
          
-        speakers_dir = '../data/txt/{}_speakers_paths.txt'.format(part[i])
+        path = paths[i]
         
-        all_speakers = np.loadtxt(
-                '../data/txt/{}_speakers.txt'.format(part[i]), dtype='str')
+        all_speakers = np.loadtxt(list_speakers_file[i], dtype='str')
         
         all_files = []
         
@@ -44,9 +44,9 @@ def generate_speech_paths(wav_folder):
             for k in range(len(files)):
                 all_files.append([all_speakers[j], files[k].replace(wav_folder, '')])            
         
-            print('Part {} - Completed {} speakers'.format(part[i], j + 1))
+            print('Speaker {} - Completed'.format(all_speakers[j]))
 
-        np.savetxt(speakers_dir, all_files, fmt='%s', delimiter=',')        
+        np.savetxt(path, all_files, fmt='%s', delimiter=',')        
     return
 
 
@@ -55,11 +55,11 @@ def get_list_speaker(root):
     
     wav_folder = root + 'vox1_test_wav/wav/'
     test_speakers = os.listdir(wav_folder)
-    np.savetxt('../txt/data/test_speakers.txt', test_speakers, fmt='%s')
+    np.savetxt(constants.TEST_SPEAKERS, test_speakers, fmt='%s')
     
     wav_folder = root + 'vox1_dev_wav/wav/'
     dev_speakers = os.listdir(wav_folder)
-    np.savetxt('../txt/data/dev_speakers.txt', dev_speakers, fmt='%s')
+    np.savetxt(constants.DEV_SPEAKERS, dev_speakers, fmt='%s')
     return
 
 
